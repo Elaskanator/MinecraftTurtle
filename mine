@@ -1,0 +1,26 @@
+local args = {...}
+local max = 100
+
+if #args == 0 then
+	d = 1
+elseif #args == 1 then
+	d = tonumber(args[1])
+	if d > max then
+		print("Too long")
+		error()
+	end
+else
+	print("Usage: mine [amount:1]")
+	error()
+end
+
+if turtle.getFuelLevel() < d then
+	print("Not enough fuel: ", turtle.getFuelLevel(), "/", d)
+	error()
+end
+
+for x = 1, d do
+	while not turtle.forward() do
+		turtle.dig()
+	end
+end

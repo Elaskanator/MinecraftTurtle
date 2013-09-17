@@ -1,0 +1,189 @@
+args = {...}
+---------------------------------------
+--Constants
+---------------------------------------
+inventorySize = 16
+maxItemIgnore = 3
+dropPeriod = 60
+stepCounter = 0
+mineCounter = 0
+displayWidth = 39
+---------------------------------------
+--Variables
+---------------------------------------
+heading = 0
+currentCoordinate = vector.new(0, 0, 0)
+ignoreLength = 0
+width = nil
+height = nil
+depthTo = nil
+necessaryFuel = nil
+isMovingRight = true
+startingFromBottom = true
+progress = 0
+startingLayer = 0
+---------------------------------------
+--Parse arguments
+---------------------------------------
+if #args == 1 then
+	radius = tonumber(args[1])
+	necessaryFuel = (2*radius+1)^2 - 1
+else
+	print("Usage: mineFlat [radius]")
+	error()
+end
+if turtle.getFuelLevel() < necessaryFuel then
+	print("Needs ", necessaryFuel, " to complete")
+end
+---------------------------------------
+--Functions
+---------------------------------------
+function turnLeft()
+  turtle.turnLeft()
+  heading = (heading + 1) % 4
+end
+function turnRight()
+  turtle.turnRight()
+  heading = (heading - 1) % 4
+end
+function mine()
+	while turtle.detect() do
+		if turtle.dig() then
+			for m = 0, math.floor(displayWidth*(mineCounter+1)/necessaryFuel) - math.floor(displayWidth*mineCounter/necessaryFuel) do
+				write("-")
+			end
+			mineCounter = mineCounter + 1
+			if mineCounter % dropPeriod == 0 then
+				cleanInventory()
+			end
+		else
+			print("Cannot dig")
+			sleep(3)
+		end
+	end
+end
+function mineDown()
+	while not turtle.down() do
+		turtle.digDown()
+	end
+	currentCoordinate.z = currentCoordinate.z - 1
+	stepCounter = stepCounter + 1
+end
+function turnTo(ang)
+	if heading == ang then
+		return
+	elseif (heading + 1) % 4 == ang then
+		turnLeft()
+	elseif (heading - 1) % 4 == ang then
+		turnRight()
+	else
+		turnRight()
+		turnRight()
+	end
+end
+function updatePosition()
+	if heading == 0 then
+		currentCoordinate.x = currentCoordinate.x + 1
+	elseif heading == 1 then
+		currentCoordinate.y = currentCoordinate.y + 1
+	elseif heading == 2 then
+		currentCoordinate.x = currentCoordinate.x - 1
+	elseif heading == 3 then
+		currentCoordinate.y = currentCoordinate.y - 1
+	else
+		print("Error in updatePosition(direction) - case 1")
+	end
+end
+function step()
+	hasSufficientFuel()
+	if turtle.forward() then
+		stepCounter = stepCounter + 1
+		updatePosition(direction)
+		return true
+	end
+	return false
+end
+function go(amount)
+	for k = 1, amount do
+		while not step() do
+			mine()
+		end
+	end
+end
+function goHome()
+	gotoPos(vector.new(0, 0, 0))
+	turnTo(0)
+	print("Got through ", j, " layers")
+	print("Mined a total of ", mineCounter, " blocks")
+	print("Travelled a distance of ", stepCounter, " meters")
+	print("Ending fuel: ", turtle.getFuelLevel())
+	error()
+end
+function hasSufficientFuel()
+	if math.abs(currentCoordinate.x) + math.abs(currentCoordinate.y) + math.abs(currentCoordinate.z) >= turtle.getFuelLevel() then
+		print("\nNot enough fuel. Going home")
+		goHome()
+	end
+end
+function isInventoryFull()
+	if turtle.getItemCount(inventorySize) > 0 then
+		print("\nInventory full - terminating")
+		goHome()
+	end
+end
+function cleanInventory()
+	for z = 1, ignoreLength do
+		turtle.select(z)
+		turtle.drop(turtle.getItemCount(z) - 1)
+		for y = ignoreLength + 1, inventorySize do
+			if turtle.getItemCount(y) > 0 and turtle.compareTo(y) then
+				turtle.select(y)
+				turtle.drop()
+				turtle.select(z)
+			end
+		end
+	end
+	turtle.select(1)
+end
+--------------------------------
+--Initialize
+---------------------------------------
+while ignoreLength <= maxItemIgnore and turtle.getItemCount(ignoreLength + 1) > 0 do
+	ignoreLength = ignoreLength + 1
+end
+if turtle.getItemCount(ignoreLength + 1) > 0 then
+	print("Aborting: turtle needs to be emptied before use")
+	error()
+elseif ignoreLength == 0 then
+	print("Place blocks to ignore in slots 1-", maxItemIgnore)
+elseif ignoreLength > maxItemIgnore then
+	print("Aborting: turtle needs to be emptied before use")
+	error()
+elseif ignoreLength < maxItemIgnore and turtle.getItemCount(ignoreLength + 1) > 0 then
+	print("Aborting: turtle needs to be emptied before use")
+	error()
+end
+if ignoreLength == 0 then
+	print("Not ignoring any blocks")
+elseif ignoreLength == 1 then
+	print("Ignoring item in slot 1")
+else
+	print("Ignoring items in slots 1-", ignoreLength)
+end
+---------------------------------------
+--Main program
+---------------------------------------
+for i = 1, displayWidth do
+	sleep(0.1)
+	write("-")
+end
+write("\n")
+turtle.select(1)
+mineDown()
+while j <= radius do
+	for k = 1, 2 do
+		go(math.ceil(j/2))
+		turnRight()
+	end
+end
+goHome()

@@ -1,0 +1,276 @@
+args = {...}
+inventorySize = 16
+pos = {0, 0, 0}
+heading = 0
+ignoreLength = 1
+counter = 1
+
+if turtle.getItemCount(1) == 0 then
+	print("Put at least one block in to ignore (eg cobblestone, dirt, gravel without gaps)")
+	error()
+else
+	while ignoreLength <= 7 and turtle.getItemCount(ignoreLength + 1) > 0 do
+		ignoreLength = ignoreLength + 1
+	end
+	if ignoreLength == inventorySize then
+		print("The turtle is full - aborting")
+		error()
+	else
+		for i = ignoreLength+2, 8 do
+			if turtle.getItemCount(i) > 0 then
+				print("There are gaps in ignore inventory - aborting")
+				error()
+			end
+		end
+	end
+end
+
+if #args ~= 2 then
+	print("Usage: mineQuarry [diameter] [depth]")
+	error()
+end
+
+diameter = tonumber(args[1])
+depth = tonumber(args[2])
+
+print("Power level: ", turtle.getFuelLevel())
+if turtle.getFuelLevel() < diameter^2 then
+	print("Aborting: not enough power")
+	error()
+else
+	print("Quarrying with diameter ", diameter, " to depth ", depth)
+end
+
+if ignoreLength > 1 then
+	print("Ignoring items in slots 1-", ignoreLength)
+else
+	print("Ignoring item in slot 1")
+end
+
+function updatePosition()
+  if heading==0 then
+    pos[1]=pos[1]+1
+  elseif heading==1 then
+    pos[2]=pos[2]+1
+  elseif heading==2 then
+    pos[1]=pos[1]-1
+  else
+    pos[2]=pos[2]-1
+  end
+end
+function turnRight()
+  turtle.turnRight()
+  heading = (heading + 1) % 4
+end
+function turnLeft()
+  turtle.turnLeft()
+  heading = (heading - 1) % 4
+end
+function dumpIgnoredBlocks()
+	for z = 1, ignoreLength do
+		turtle.select(z)
+		if turtle.getItemCount(z) > 10 then
+			turtle.drop(turtle.getItemCount(z) - 1)
+		end
+		for y = ignoreLength + 1, inventorySize do
+			if turtle.getItemCount(y) > 0 and turtle.compareTo(y) then
+				turtle.select(y)
+				turtle.drop()
+				turtle.select(z)
+			end
+		end
+	end
+	turtle.select(1)
+end
+function mineForward()
+	while turtle.detect() or not turtle.forward() do
+		turtle.dig()
+		counter = counter + 1
+		if counter % 20 == 0 then
+			dumpIgnoredBlocks()
+		end
+	end
+	updatePosition()
+end
+function mineDown()
+	if turtle.detectDown() and not turtle.digDown() then
+		print("Cannot dig down. Bedrock?")
+		print("Aborting")
+		return false
+	else
+		while not turtle.down() do
+			turtle.digDown()
+			counter = counter + 1
+			if counter % 20 == 0 then
+				dumpIgnoredBlocks()
+			end
+		end
+	end
+	pos[3] = pos[3] - 1
+	return true
+end
+function mineUp()
+	while turtle.detectUp() or not turtle.up() do
+		turtle.digUp()
+		counter = counter + 1
+		if counter % 20 == 0 then
+			dumpIgnoredBlocks()
+		end
+	end
+end
+function sufficientFuel()
+	if turtle.getFuelLevel() <= 2 * (diameter-1) + math.abs(pos[3]) then
+		return false
+	else
+		return true
+	end
+end
+function inventoryFull()
+	for idx = 1, inventorySize do
+		if turtle.getItemCount(idx) == 0 then
+			return false
+		end
+	end
+	return true
+end
+function digLayer(direction)
+	if mineDown() then
+		for x = 1, diameter do
+			for y = 1, diameter - 1 do
+				if not sufficientFuel() then
+					print("Out of fuel")
+					return false
+				elseif inventoryFull() then
+					print("Inventory full")
+					return false
+				else
+					mineForward()
+				end
+			end
+			if not sufficientFuel() then
+				print("Out of fuel")
+				return false
+			elseif inventoryFull() then
+				print("Inventory full")
+				return false
+			else
+				if x < diameter then
+					if direction then
+						turnRight()
+						mineForward()
+						turnRight()
+					else
+						turnLeft()
+						mineForward()
+						turnLeft()
+					end
+					direction = not direction
+				end
+			end
+		end
+	else
+		return false
+	end
+	return true
+end
+function turnTo(ang)
+	if (heading - 1) % 4 == ang then
+		turnLeft()
+	else
+		while heading ~= ang do
+			turnRight()
+		end
+	end
+end
+function go(n)
+	for x = 1, n do
+		mineForward()
+	end
+	goHome()
+end
+function goHome()
+	rightOrientation = (heading + 1) % 4
+	leftOrientation = (heading - 1) % 4
+	if pos[1] == 0 and pos[2] == 0 then
+		turnTo(0)
+	else
+		if heading == 0 and pos[1] < 0 then
+			go(-pos[1])
+		elseif heading == 1 and pos[2] < 0 then
+			go(-pos[2])
+		elseif heading == 2 and pos[1] > 0 then
+			go(pos[1])
+		elseif heading == 3 and pos[2] > 0 then
+			go(pos[2])
+		else
+			if rightOrientation == 0 and pos[1] < 0 then
+				turnRight()
+				go(-pos[1])
+			elseif rightOrientation == 1 and pos[2] < 0 then
+				turnRight()
+				go(-pos[2])
+			elseif rightOrientation == 2 and pos[1] > 0 then
+				turnRight()
+				go(pos[1])
+			elseif rightOrientation == 3 and pos[2] > 0 then
+				turnRight()
+				go(pos[2])
+			else
+				if leftOrientation == 0 and pos[1] < 0 then
+					turnLeft()
+					go(-pos[1])
+				elseif leftOrientation == 1 and pos[2] < 0 then
+					turnLeft()
+					go(-pos[2])
+				elseif leftOrientation == 2 and pos[1] > 0 then
+					turnLeft()
+					go(pos[1])
+				elseif leftOrientation == 3 and pos[2] > 0 then
+					turnLeft()
+					go(pos[2])
+				else
+					turnLeft()
+					turnLeft()
+					if pos[1] == 0 then
+						go(math.abs(pos[2]))
+					else
+						go(math.abs(pos[1]))
+					end
+				end
+			end
+		end
+	end
+end
+
+switch = true
+turtle.select(1)
+while not turtle.detectDown() do
+	mineDown()
+end
+
+for i = 1, depth - math.abs(pos[3]) do
+	if inventoryFull() then
+		print("Inventory full")
+		break
+	else
+		if digLayer(switch) then
+			if diameter % 2 == 0 then
+				switch = not switch
+			end
+			turnRight()
+			turnRight()
+		else
+			break
+		end
+	end
+	print("Layer ", i, " done")
+end
+
+print("Returning to origin")
+goHome()
+if pos[3] < 0 then
+	for k = 1, -pos[3] do
+		mineUp()
+	end
+end
+print("Ending fuel: ", turtle.getFuelLevel())

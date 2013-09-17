@@ -1,0 +1,29 @@
+local args = {...}
+local max = 50
+
+if #args == 0 then
+	d = 1
+elseif #args == 1 then
+	d = tonumber(args[1])
+	if d > max then
+		print("Too long")
+		error()
+	end
+else
+	print("Usage: mineDown [amount:1]")
+	error()
+end
+
+if turtle.getFuelLevel() < d then
+	print("Not enough fuel: ", turtle.getFuelLevel(), "/", d)
+	error()
+end
+
+for x = 1, d do
+	while not turtle.down() do
+		if not turtle.digDown() then
+			print("Must have hit bedrock - aborting")
+			error()
+		end
+	end
+end

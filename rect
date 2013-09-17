@@ -1,0 +1,302 @@
+args = {...}
+---------------------------------------
+--Constants
+---------------------------------------
+layerCounter = 0
+stepCounter = 0
+mineCounter = 0
+displayWidth = 39
+maxSleepCounter = 10
+---------------------------------------
+--Variables
+---------------------------------------
+heading = 0
+currentCoordinate = vector.new(0,0,0)
+width = nil
+height = nil
+depth = nil
+necessaryFuel = nil
+isMovingRight = true
+startingFromBottom = true
+progress = 0
+sleepCounter = 0
+---------------------------------------
+--Parse arguments
+---------------------------------------
+if #args == 3 then
+	width = tonumber(args[1])
+	height = tonumber(args[2])
+	depth = tonumber(args[3])
+else
+	print("- Mines a region up, right and forward of placement")
+	print("- Returns to the starting point when done")
+	print("- Place blocks to ignore in slots 1-", maxItemIgnore)
+	print("- Most efficient if height is divisible by 3")
+	print("- Usage:")
+	print("rect [width] [height] [depth]")
+	error()
+end
+necessaryFuel = width * depth * math.ceil(height/3)
+if turtle.getFuelLevel() < necessaryFuel then
+	print("Needs at least ", necessaryFuel, " fuel to begin")
+	error()
+end
+if width == 0 or height == 0 or depth == 0 then
+	print("Nonzero dimensions required")
+	error()
+end
+if height % 3 > 0 then
+	print("Most efficient if height % 3 = 0")
+end
+---------------------------------------
+--Functions
+---------------------------------------
+function updatePosition(direction)
+	if direction == 0 then
+		if heading == 0 then
+			currentCoordinate.x = currentCoordinate.x + 1
+		elseif heading == 1 then
+			currentCoordinate.y = currentCoordinate.y + 1
+		elseif heading == 2 then
+			currentCoordinate.x = currentCoordinate.x - 1
+		elseif heading == 3 then
+			currentCoordinate.y = currentCoordinate.y - 1
+		else
+			print("Error in updatePosition(direction) - case 1")
+		end
+	elseif direction == 1 then
+		currentCoordinate.z = currentCoordinate.z + 1
+	elseif direction == 2 then
+		currentCoordinate.z = currentCoordinate.z - 1
+	else
+		print("Error in updatePosition(direction) - case 2")
+	end
+end
+function turnLeft()
+  turtle.turnLeft()
+  heading = (heading + 1) % 4
+end
+function turnRight()
+  turtle.turnRight()
+  heading = (heading - 1) % 4
+end
+function mineSleep()
+	if sleepCounter > maxSleepCounter then
+		print("Stuck for too long - terminating")
+		goHome()
+	end
+	sleep(1)
+	sleepCounter = sleepCounter + 1
+end
+function mine(direction)
+	if direction == 0 then -- forward
+		while turtle.detect() do
+			if turtle.dig() then
+				mineCounter = mineCounter + 1
+			else
+				print("Sleeping - case 1")
+				mineSleep()
+			end
+		end
+	elseif direction == 1 then -- up
+		while turtle.detectUp() do
+			if turtle.digUp() then
+				mineCounter = mineCounter + 1
+			else
+				print("Sleeping - case 2")
+				mineSleep()
+			end
+		end
+	elseif direction == 2 then -- down
+		while turtle.detectDown() do
+			if turtle.digDown() then
+				mineCounter = mineCounter + 1
+			else
+				print("Sleeping - case 3")
+				mineSleep()
+			end
+		end
+	end
+	return true
+end
+function turnTo(ang)
+	if heading == ang then
+		return
+	elseif (heading + 1) % 4 == ang then
+		turnLeft()
+	elseif (heading - 1) % 4 == ang then
+		turnRight()
+	else
+		turnRight()
+		turnRight()
+	end
+end
+function step(direction)
+	if direction == 0 then
+		if turtle.forward() then
+			stepCounter = stepCounter + 1
+			updatePosition(direction)
+			return true
+		end
+	elseif direction == 1 then
+		if turtle.up() then
+			stepCounter = stepCounter + 1
+			updatePosition(direction)
+			return true
+		end
+	elseif direction == 2 then
+		if turtle.down() then
+			stepCounter = stepCounter + 1
+			updatePosition(direction)
+			return true
+		end
+	else
+		print("Error in step(direction)")
+	end
+	return false
+end
+function go(amount, direction)
+	for k = 1, amount do
+		while not step(direction) do
+			mine(direction)
+		end
+	end
+end
+function gotoPos(destination)
+	x1 = currentCoordinate.x
+	y1 = currentCoordinate.y
+	z1 = currentCoordinate.z
+	x2 = destination.x
+	y2 = destination.y
+	z2 = destination.z
+	if x1 == x2 and y1 == y2 and z1 == z2 then
+		return
+	end
+	if x1 < x2 then
+		turnTo(0)
+		go(x2 - x1, 0)
+	elseif x1 > x2 then
+		turnTo(2)
+		go(x1 - x2, 0)
+	end
+	if y1 < y2 then
+		turnTo(1)
+		go(y2 - y1, 0)
+	elseif y1 > y2 then
+		turnTo(3)
+		go(y1 - y2, 0)
+	end
+	if z1 > z2 then
+		go(z1 - z2, 2)
+	elseif z1 < z2 then
+		go(z2 - z1, 1)
+	end
+end
+function goHome()
+	gotoPos(vector.new(0, 0, 0))
+	turnTo(0)
+	print("Got through ", layerCounter, " layers")
+	print("Mined a total of ", mineCounter, " blocks")
+	print("Travelled a distance of ", stepCounter, " meters")
+	print("Ending fuel: ", turtle.getFuelLevel())
+	error()
+end
+function digLayer()
+	if startingFromBottom then
+		while currentCoordinate.z <= height - 1 do
+			for w = 1, width - 1 do
+				if currentCoordinate.z > 0 then
+					mine(2)
+				end
+				if currentCoordinate.z < height - 1 then
+					mine(1)
+				end
+				go(1, 0)
+			end
+			if currentCoordinate.z > 0 then
+				mine(2)
+			end
+			if currentCoordinate.z < height - 1 then
+				mine(1)
+			end
+			isMovingRight = not isMovingRight
+			if currentCoordinate.z < height - 2 then
+				turnRight()
+				turnRight()
+				for i = 1, 3 do
+					if currentCoordinate.z < height - 2 then
+						go(1, 1)
+					else
+						break
+					end
+				end
+			else
+				break
+			end
+		end
+	else
+		while currentCoordinate.z >= 0 do
+			for w = 1, width - 1 do
+				if currentCoordinate.z < height - 1 then
+					mine(1)
+				end
+				if currentCoordinate.z > 0 then
+					mine(2)
+				end
+				go(1, 0)
+			end
+			if currentCoordinate.z < height - 1 then
+				mine(1)
+			end
+			if currentCoordinate.z > 0 then
+				mine(2)
+			end
+			isMovingRight = not isMovingRight
+			if currentCoordinate.z > 1 then
+				turnRight()
+				turnRight()
+				for i = 1, 3 do
+					if currentCoordinate.z > 1 then
+						go(1, 2)
+					else
+						break
+					end
+				end
+			else
+				break
+			end
+		end
+	end
+	startingFromBottom = not startingFromBottom
+	return true
+end
+function main()
+	if isMovingRight then
+		turnRight()
+	else
+		turnLeft()
+	end
+	digLayer()
+	layerCounter = layerCounter + 1
+	if isMovingRight then
+		turnRight()
+	else
+		turnLeft()
+	end
+end
+---------------------------------------
+--Main program
+---------------------------------------
+for i = 1, displayWidth do
+	sleep(0.1)
+	write("-")
+end
+write("\n")
+if height > 2 then
+	go(1, 1)
+end
+for i = 1, depth do
+	go(1, 0)
+	main()
+end
+goHome()

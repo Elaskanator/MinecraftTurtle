@@ -1,0 +1,254 @@
+args = {...}
+---------------------------------------
+--Constants
+---------------------------------------
+inventorySize = 16
+maxItemIgnore = 3
+dropPeriod = 60
+layerCounter = 0
+stepCounter = 0
+mineCounter = 0
+displayWidth = 39
+---------------------------------------
+--Variables
+---------------------------------------
+heading = 0
+currentCoordinate = vector.new(0,0,0)
+ignoreLength = 0
+height = nil
+depth = nil
+isMovingRight = true
+startingFromBottom = true
+progress = 0
+startingLayer = 0
+requiredFuel = nil
+---------------------------------------
+--Parse arguments and initialize
+---------------------------------------
+if #args == 2 then
+	height = tonumber(args[1])
+	depth = tonumber(args[2])
+else
+	print("- Mines a region down depthTo from placement with crosssection width x height")
+	print("- Returns to the starting point when full or out of energy")
+	print("- Place blocks to ignore in slots 1-", maxItemIgnore)
+	print("- Usage:")
+	print("mineSlice [height] [depth]")
+	error()
+end
+if height == 0 or depth == 0 then
+	print("Nonzero dimensions required")
+	error()
+end
+requiredFuel = height*depth + height + depth
+if turtle.getFuelLevel() < requiredFuel then
+	write("Not enough power - aborting\n")
+	error()
+end
+while ignoreLength <= maxItemIgnore and turtle.getItemCount(ignoreLength + 1) > 0 do
+	ignoreLength = ignoreLength + 1
+end
+if turtle.getItemCount(ignoreLength + 1) > 0 then
+	print("Aborting: turtle needs to be emptied before use")
+	error()
+elseif ignoreLength == 0 then
+	print("Place blocks to ignore in slots 1-", maxItemIgnore)
+elseif ignoreLength > maxItemIgnore then
+	print("Aborting: turtle needs to be emptied before use")
+	error()
+elseif ignoreLength < maxItemIgnore and turtle.getItemCount(ignoreLength + 1) > 0 then
+	print("Aborting: turtle needs to be emptied before use")
+	error()
+end
+if ignoreLength == 0 then
+	print("Not ignoring any blocks")
+elseif ignoreLength == 1 then
+	print("Ignoring item in slot 1")
+else
+	print("Ignoring items in slots 1-", ignoreLength)
+end
+---------------------------------------
+--Functions
+---------------------------------------
+function hasSufficientFuel()
+	if math.abs(currentCoordinate.x) + math.abs(currentCoordinate.y) + math.abs(currentCoordinate.z) >= turtle.getFuelLevel() then
+		print("Not enough fuel. Going home")
+		goHome()
+	end
+end
+function isInventoryFull()
+	if turtle.getItemCount(inventorySize) > 0 then
+		print("Inventory full - terminating")
+		goHome()
+	end
+end
+function updatePosition(direction)
+	if direction == 0 then
+		if heading == 0 then
+			currentCoordinate.x = currentCoordinate.x + 1
+		elseif heading == 1 then
+			currentCoordinate.y = currentCoordinate.y + 1
+		elseif heading == 2 then
+			currentCoordinate.x = currentCoordinate.x - 1
+		elseif heading == 3 then
+			currentCoordinate.y = currentCoordinate.y - 1
+		else
+			print("Error in updatePosition(direction) - case 1")
+		end
+	elseif direction == 1 then
+		currentCoordinate.z = currentCoordinate.z + 1
+	elseif direction == 2 then
+		currentCoordinate.z = currentCoordinate.z - 1
+	else
+		print("Error in updatePosition(direction) - case 2")
+	end
+end
+function turnLeft()
+  turtle.turnLeft()
+  heading = (heading + 1) % 4
+end
+function turnRight()
+  turtle.turnRight()
+  heading = (heading - 1) % 4
+end
+function turnTo(ang)
+	if heading == ang then
+		return
+	elseif (heading + 1) % 4 == ang then
+		turnLeft()
+	elseif (heading - 1) % 4 == ang then
+		turnRight()
+	else
+		turnRight()
+		turnRight()
+	end
+end
+function mine(direction)
+	if direction == 0 then -- forward
+		while turtle.detect() do
+			if turtle.dig() then
+				mineCounter = mineCounter + 1
+				cleanInventory()
+			else
+				print("Sleeping - case 1")
+				sleep(1)
+			end
+		end
+	elseif direction == 1 then -- up
+		while turtle.detectUp() do
+			if turtle.digUp() then
+				mineCounter = mineCounter + 1
+				cleanInventory()
+			else
+				print("Sleeping - case 2")
+				sleep(1)
+			end
+		end
+	elseif direction == 2 then -- down
+		while turtle.detectDown() do
+			if turtle.digDown() then
+				mineCounter = mineCounter + 1
+				cleanInventory()
+			else
+				print("Sleeping - case 3")
+				sleep(1)
+			end
+		end
+	end
+	return true
+end
+function step(direction)
+	hasSufficientFuel()
+	if direction == 0 then -- forward
+		if turtle.forward() then
+			stepCounter = stepCounter + 1
+			updatePosition(direction)
+			return true
+		end
+	elseif direction == 1 then -- up
+		if turtle.up() then
+			stepCounter = stepCounter + 1
+			updatePosition(direction)
+			return true
+		end
+	elseif direction == 2 then -- down
+		if turtle.down() then
+			stepCounter = stepCounter + 1
+			updatePosition(direction)
+			return true
+		end
+	else
+		print("Error in step(direction)")
+	end
+	return false
+end
+function gotoPos(destination)
+	x1 = currentCoordinate.x
+	y1 = currentCoordinate.y
+	z1 = currentCoordinate.z
+	x2 = destination.x
+	y2 = destination.y
+	z2 = destination.z
+	if x1 == x2 and y1 == y2 and z1 == z2 then
+		return
+	end
+	if x1 < x2 then
+		turnTo(0)
+		go(x2 - x1, 0)
+	elseif x1 > x2 then
+		turnTo(2)
+		go(x1 - x2, 0)
+	end
+	if y1 < y2 then
+		turnTo(1)
+		go(y2 - y1, 0)
+	elseif y1 > y2 then
+		turnTo(3)
+		go(y1 - y2, 0)
+	end
+	if z1 > z2 then
+		go(z1 - z2, 2)
+	elseif z1 < z2 then
+		go(z2 - z1, 1)
+	end
+end
+function goHome()
+	gotoPos(vector.new(0, 0, 0))
+	turnTo(0)
+	print("Got through ", layerCounter, " layers")
+	print("Mined a total of ", mineCounter, " blocks")
+	print("Travelled a distance of ", stepCounter, " meters")
+	print("Ending fuel: ", turtle.getFuelLevel())
+	error()
+end
+function go(amount, direction)
+	for k = 1, amount do
+		while not step(direction) do
+			mine(direction)
+		end
+	end
+end
+function cleanInventory()
+	if mineCounter % dropPeriod == 0 then
+		for z = 1, ignoreLength do
+			turtle.select(z)
+			turtle.drop(turtle.getItemCount(z) - 1)
+		end
+		turtle.select(1)
+	end
+end
+for i = 1, displayWidth do
+	sleep(0.1)
+	write("-")
+end
+write("\n")
+turtle.select(1)
+while layerCounter < depth do
+	go(1, 0)
+	isInventoryFull()
+	go(height - 1, 1 + (layerCounter%2))
+	isInventoryFull()
+	layerCounter = layerCounter + 1
+end
+goHome()
+print("Mining complete")

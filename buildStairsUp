@@ -1,0 +1,147 @@
+args = {...}
+---------------------------------------
+--Constants
+---------------------------------------
+inventorySize = 16
+stepCounter = 0
+mineCounter = 0
+displayWidth = 39
+---------------------------------------
+--Variables
+---------------------------------------
+height = nil
+innerHeight = 4
+materialSlots = {}
+---------------------------------------
+--Parse arguments
+---------------------------------------
+if #args == 0 or #args > 2 then
+	print("- Creates a descending staircase")
+	print("- Usage:")
+	print("buildStairsDown [height] [innerHeight:4]")
+	error()
+else
+	height = tonumber(args[1])
+	if #args == 2 then 
+		innerHeight = tonumber(args[2])
+	end
+end
+---------------------------------------
+--Functions
+---------------------------------------
+
+for i = 1, inventorySize do
+	if turtle.getItemCount(i) > 0 then
+		materialSlots[#materialSlots + 1] = i
+	end
+end
+function placeBlock(direction)
+	local idx = nil
+	local amt = nil
+	if #materialSlots > 0 then
+		for k = 1, #materialSlots do
+			amt = turtle.getItemCount(materialSlots[k])
+			if amt > 1 then
+				idx = materialSlots[k]
+				break
+			elseif amt == 1 then
+				idx = table.remove(materialSlots, k)
+				break
+			else
+				print("Failure: placeBlock(direction) case 1")
+				error()
+			end
+		end
+	else
+		print("Out of building materials")
+		error()
+	end
+	turtle.select(idx)
+	if direction == 0 then -- forward
+		turtle.place()
+	elseif direction == 1 then -- up
+		turtle.placeUp()
+	elseif direction == 2 then -- down
+		turtle.placeDown()
+	else
+		print("Failure: placeBlock(direction) case 2")
+		error()
+	end
+	turtle.select(1)
+end
+function mine(direction)
+	if direction == 0 then -- forward
+		while turtle.detect() do
+			if turtle.dig() then
+				mineCounter = mineCounter + 1
+			else
+				print("Sleeping - case 1")
+				sleep(1)
+			end
+		end
+	elseif direction == 1 then -- up
+		while turtle.detectUp() do
+			if turtle.digUp() then
+				mineCounter = mineCounter + 1
+			else
+				print("Sleeping - case 2")
+				sleep(1)
+			end
+		end
+	elseif direction == 2 then -- down
+		while turtle.detectDown() do
+			if turtle.digDown() then
+				mineCounter = mineCounter + 1
+			else
+				print("Sleeping - case 3")
+				sleep(1)
+			end
+		end
+	end
+	return true
+end
+function step(direction)
+	if direction == 0 then -- forward
+		if turtle.forward() then
+			stepCounter = stepCounter + 1
+			return true
+		end
+	elseif direction == 1 then -- up
+		if turtle.up() then
+			stepCounter = stepCounter + 1
+			return true
+		end
+	elseif direction == 2 then -- down
+		if turtle.down() then
+			stepCounter = stepCounter + 1
+			return true
+		end
+	else
+		print("Error in step(direction)")
+	end
+	return false
+end
+function go(amount, direction)
+	for k = 1, amount do
+		while not step(direction) do
+			mine(direction)
+		end
+	end
+end
+---------------------------------------
+--Main program
+---------------------------------------
+for i = 1, displayWidth do
+	sleep(0.1)
+	write("-")
+end
+write("\n")
+go(1, 1)
+for i = 1, height do
+	go(1, 0)
+	placeBlock(2)
+	go(innerHeight, 1)
+	placeBlock(1)
+	go(innerHeight - 1, 2)
+end
+go(1, 2)

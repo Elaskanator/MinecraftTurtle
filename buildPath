@@ -1,0 +1,198 @@
+args = {...}
+---------------------------------------
+--Constants
+---------------------------------------
+inventorySize = 16
+displayWidth = 39
+---------------------------------------
+--Variables
+---------------------------------------
+length = nil
+stepCounter = 0
+mineCounter = 0
+layerCounter = 0
+progress = 0
+materialSlots = {}
+---------------------------------------
+--Parse arguments & initial conditions
+---------------------------------------
+if #args == 1 then
+	length = tonumber(args[1])
+else
+	print("Put building material in turtle's inventory")
+	print("- Usage:")
+	print("buildPath [length]")
+	error()
+end
+if turtle.getFuelLevel() < necessaryFuel then
+	print("Not enough fuel for job")
+	error()
+end
+for i = 1, inventorySize do
+	if turtle.getItemCount(i) > 0 then
+		materialSlots[#materialSlots + 1] = i
+	end
+end
+function blocksRemaining()
+	total = 0
+	for idx = 1, #materialSlots do
+		total = total + turtle.getItemCount(idx)
+	end
+	return total
+end
+---------------------------------------
+--Functions
+---------------------------------------
+function mine(direction)
+	if direction == 0 then -- forward
+		while turtle.detect() do
+			if turtle.dig() then
+				mineCounter = mineCounter + 1
+			else
+				print("Sleeping - case 1")
+				sleep(1)
+			end
+		end
+	elseif direction == 1 then -- up
+		while turtle.detectUp() do
+			if turtle.digUp() then
+				mineCounter = mineCounter + 1
+			else
+				print("Sleeping - case 2")
+				sleep(1)
+			end
+		end
+	elseif direction == 2 then -- down
+		while turtle.detectDown() do
+			if turtle.digDown() then
+				mineCounter = mineCounter + 1
+			else
+				print("Sleeping - case 3")
+				sleep(1)
+			end
+		end
+	end
+	return true
+end
+function step(direction)
+	if direction == 0 then -- forward
+		if turtle.forward() then
+			stepCounter = stepCounter + 1
+			return true
+		end
+	elseif direction == 1 then -- up
+		if turtle.up() then
+			stepCounter = stepCounter + 1
+			return true
+		end
+	elseif direction == 2 then -- down
+		if turtle.down() then
+			stepCounter = stepCounter + 1
+			return true
+		end
+	else
+		print("Error in step(direction)")
+	end
+	return false
+end
+function go(direction)
+	while not step(direction) do
+		mine(direction)
+	end
+end
+function placeBlock(direction)
+	local idx = nil
+	local amt = nil
+	if #materialSlots > 0 then
+		for k = 1, #materialSlots do
+			amt = turtle.getItemCount(materialSlots[k])
+			if amt > 1 then
+				idx = materialSlots[k]
+				break
+			elseif amt == 1 then
+				idx = table.remove(materialSlots, k)
+				break
+			else
+				print("Failure: placeBlock(direction) case 1")
+				error()
+			end
+		end
+	else
+		print("\nOut of building materials")
+		print("Got through ", layerCounter, " layers")
+		error()
+	end
+	turtle.select(idx)
+	if direction == 0 then -- forward
+		turtle.place()
+	elseif direction == 1 then -- up
+		turtle.placeUp()
+	elseif direction == 2 then -- down
+		turtle.placeDown()
+	else
+		print("Failure: placeBlock(direction) case 2")
+		error()
+	end
+	turtle.select(1)
+end
+function detectBlock(direction)
+	if direction == 0 then -- forward
+		return turtle.detect()
+	elseif direction == 1 then -- up
+		return turtle.detectUp()
+	elseif direction == 2 then -- down
+		return turtle.detectDown()
+	else
+		print("Failure: placeBlock(direction)")
+		error()
+	end
+end
+function digLayer(dir)
+	go(0)
+	if not detectBlock(dir + 1) then
+		placeBlock(dir + 1)
+	end
+	turtle.turnLeft()
+	if not turtle.detect() then
+		placeBlock(0)
+	end
+	turtle.turnRight()
+	turtle.turnRight()
+	if not turtle.detect() then
+		placeBlock(0)
+	end
+	go((dir + 1) % 2 + 1)
+	if not detectBlock((dir + 1) % 2 + 1) then
+		placeBlock((dir + 1) % 2 + 1)
+	end
+	if not turtle.detect() then
+		placeBlock(0)
+	end
+	turtle.turnLeft()
+	turtle.turnLeft()
+	if not turtle.detect() then
+		placeBlock(0)
+	end
+	turtle.turnRight()
+end
+---------------------------------------
+--Main program
+---------------------------------------
+print("Starting")
+for i = 1, displayWidth do
+	sleep(0.1)
+	write("-")
+end
+write("\n")
+for i = 1, length do
+	digLayer(i % 2)
+	layerCounter = layerCounter + 1
+	for j = 1, math.floor(layerCounter * displayWidth / length) - progress do
+		write("-")
+	end
+	progress = math.floor(layerCounter * displayWidth / length)
+end
+print("Got through ", layerCounter, " layers")
+print("Mined a total of ", mineCounter, " blocks")
+print("Travelled a total of ", stepCounter, " meters")
+print("Ending fuel: ", turtle.getFuelLevel())

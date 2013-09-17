@@ -1,0 +1,254 @@
+---------------------------------------
+--Constants
+---------------------------------------
+origin = vector.new(15, -11, 50)
+originWidth = 10
+homeHeading = 3
+name = os.getComputerLabel()
+displayWidth = 39
+---------------------------------------
+--Variables
+---------------------------------------
+homeCoordinate = nil
+heading = nil
+currentCoordinate = nil
+---------------------------------------
+--Functions
+---------------------------------------
+function turnLeft()
+  turtle.turnLeft()
+  heading = (heading + 1) % 4
+end
+function turnRight()
+  turtle.turnRight()
+  heading = (heading - 1) % 4
+end
+function getLocation()
+	tempVector = vector.new(gps.locate(3, false))
+	if tempVector.x == 0 and tempVector.y == 0 and tempVector.z == 0 then
+		print("Failed to connect to GPS")
+		error()
+	end
+	return tempVector
+end
+function mine(direction)
+	if turtle.getFuelLevel() == 0 then
+		print("Out of fuel!")
+		error()
+	end
+	if direction == 0 then -- forward
+		while not turtle.forward() do
+			if not turtle.dig() then
+				print("Sleeping - case 1")
+				sleep(1)
+			end
+		end
+	elseif direction == 1 then -- up
+		while not turtle.up() do
+			if not turtle.digUp() then
+				print("Sleeping - case 2")
+				sleep(1)
+			end
+		end
+	elseif direction == 2 then -- down
+		while not turtle.down() do
+			if not turtle.digDown() then
+				print("Sleeping - case 3")
+				sleep(1)
+			end
+		end
+	end
+	return true
+end
+function go(amount)
+	for k = 1, amount do
+		while not mine(0) do
+			print("Cannot go forward")
+			sleep(1)
+		end
+	end
+end
+function goUp(amount)
+	for k = 1, amount do
+		while not mine(1) do
+			print("Cannot go up")
+			sleep(1)
+		end
+	end
+end
+function goDown(amount)
+	for k = 1, amount do
+		while not mine(2) do
+			print("Cannot go down")
+			sleep(1)
+		end
+	end
+end
+function turnTo(ang)
+	if heading == ang then
+		return
+	elseif (heading + 1) % 4 == ang then
+		turnLeft()
+	elseif (heading - 1) % 4 == ang then
+		turnRight()
+	else
+		turnRight()
+		turnRight()
+	end
+end
+function gotoPos(destination)
+	x2, y2, z2 = destination.x, destination.y, destination.z
+	currentCoordinate = getLocation()
+	x1 = tempVector.x
+	y1 = tempVector.y
+	z1 = tempVector.z
+	print(x1, ", ", y1, ", ", z1, " -> ", x2, ", ", y2, ", ", z2)
+	if x1 < x2 then
+		turnTo(0)
+		go(x2 - x1)
+	elseif x1 > x2 then
+		turnTo(2)
+		go(x1 - x2)
+	end
+	if y1 < y2 then
+		turnTo(1)
+		go(y2 - y1)
+	elseif y1 > y2 then
+		turnTo(3)
+		go(y1 - y2)
+	end
+	if z1 > z2 then
+		goDown(z1 - z2)
+	elseif z1 < z2 then
+		goUp(z2 - z1)
+	end
+end
+function deltaPosToHeading( pos2)
+	dx = currentCoordinate.x - pos2.x
+	dy = currentCoordinate.y - pos2.y
+	if dx > 0 then
+		return 2
+	elseif dx < 0 then
+		return 0
+	elseif dy > 0 then
+		return 3
+	elseif dy < 0 then
+		return 1
+	else
+		print("Error in deltaPosToHeading()")
+		error()
+	end
+	error()
+end
+function findHeading()
+	currentCoordinate = getLocation()
+	tempPos = nil
+	tempHeading = -1
+	if turtle.forward() then
+		tempPos = getLocation()
+		tempHeading = deltaPosToHeading(tempPos)
+	elseif turtle.back() then
+		tempPos = getLocation()
+		tempHeading = (deltaPosToHeading(tempPos) + 2) % 4
+	else
+		turtle.turnRight()
+		if turtle.forward() then
+			tempPos = getLocation()
+			tempHeading = deltaPosToHeading(tempPos)
+		elseif turtle.back() then
+			tempPos = getLocation()
+			tempHeading = (deltaPosToHeading(tempPos) + 2) % 4
+		else
+			print("can't move without digging")
+			go(0)
+			tempPos = getLocation()
+			tempHeading = deltaPosToHeading(tempPos)
+		end
+	end
+	if tempHeading == 0 then
+		print("Facing east")
+	elseif tempHeading == 1 then
+		print("Facing north")
+	elseif tempHeading == 2 then
+		print("Facing west")
+	elseif tempHeading == 3 then
+		print("Facing south")
+	else
+		print("Error in findHeading()")
+		error()
+	end
+	currentCoordinate = getLocation()
+	return tempHeading
+end
+function travelRoute(route)
+	for idx = 1, table.getn(route) do
+		gotoPos(route[idx])
+	end
+end
+function isHome()
+	return currentCoordinate.x == homeCoordinate.x and
+		   currentCoordinate.y == homeCoordinate.y and
+		   currentCoordinate.z == homeCoordinate.z
+end
+function isInBase()
+	return currentCoordinate.y < 17 and currentCoordinate.y > -21 and
+		   currentCoordinate.x < 34 and currentCoordinate.x > 1
+end
+function goHome()
+	approachRoute1 = {vector.new(15, -13, 48)}
+	approachRoute2 = {vector.new(currentCoordinate.x, currentCoordinate.y, 86),
+					  vector.new(15, -24, 86), vector.new(15, -24, 51)}
+	finalRoute = {vector.new(15, -13, 51), vector.new(homeCoordinate.x, homeCoordinate.y, 51),
+				  vector.new(homeCoordinate.x, homeCoordinate.y, 50)}
+	if currentCoordinate.z < 49 then
+		travelRoute(approachRoute1)
+	elseif currentCoordinate.z < 86 then
+		if isInBase() then
+			print("Inside base - not moving")
+			error()
+		else
+			travelRoute(approachRoute1)
+		end
+	else
+		travelRoute(approachRoute2)
+	end
+	travelRoute(finalRoute)
+	turnTo(homeHeading)
+end
+function getId()
+	i = 0
+	while i < string.len(name) and tonumber(string.sub(name, string.len(name)-(i+1))) ~= nil do
+		i = i + 1
+	end
+	return tonumber(string.sub(name, string.len(name)-i))
+end
+function idToHomePosition(num)
+	baseX = origin.x
+	baseY = origin.y
+	homeX = num % originWidth 
+	homeY = math.floor(num / originWidth)
+	return vector.new(baseX - homeX, baseY + homeY, origin.z)
+end
+---------------------------------------
+--Main program
+---------------------------------------
+print(name, " starting up")
+print("Fuel is ", turtle.getFuelLevel())
+sleep(1)
+currentCoordinate = getLocation()
+homeCoordinate = idToHomePosition(getId())
+if isHome() then
+	print("At home")
+else
+	print("At ", currentCoordinate)
+	for i = 1, displayWidth do
+		sleep(0.1)
+		write("-")
+	end
+	write("\n")
+	heading = findHeading()
+	goHome()
+	turnTo(homeHeading)
+	print("At home")
+	print("Fuel is ", turtle.getFuelLevel())
+end
